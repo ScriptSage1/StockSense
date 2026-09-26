@@ -51,4 +51,43 @@ describe('Login page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid email or password'))
   })
+
+  it('asks for the emailed code after the password, then signs in', async () => {
+    fetchMock.mockImplementation(async (url, init) => {
+      const path = String(url)
+      if (path.includes('/auth/login'))
+        return json(200, {
+          challenge_token: 'challenge-abc',
+          purpose: 'login',
+          email: 'maya@stocksense.dev',
+          expires_in: 600,
+          resend_after: 30,
+        })
+      if (path.includes('/auth/otp/verify')) {
+        const body = JSON.parse(String(init?.body))
+        return body.otp === '123456'
+          ? json(200, {
+              access_token: 'tok',
+              token_type: 'bearer',
+              expires_in: 1800,
+              user: { id: 'u1', full_name: 'Maya', email: 'maya@stocksense.dev', role: 'manager', is_active: true, created_at: '' },
+            })
+          : json(400, { detail: 'Incorrect code. 4 attempts left.', code: 'OTP_INVALID', field: 'otp' })
+      }
+      return json(401, { detail: 'no session', code: 'REFRESH_INVALID' })
+    })
+    renderLogin()
+    await userEvent.type(screen.getByLabelText('Email'), 'maya@stocksense.dev')
+    await userEvent.type(screen.getByLabelText('Password'), 'Passw0rd1')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByText('maya@stocksense.dev')).toBeInTheDocument()
+    await userEvent.type(await screen.findByLabelText('Digit 1'), '999999')
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Incorrect code'))
+
+    await userEvent.type(screen.getByLabelText('Digit 1'), '123456')
+    expect(await screen.findByText('Signed in')).toBeInTheDocument()
+    const verifyCalls = fetchMock.mock.calls.filter(([u]) => String(u).includes('/auth/otp/verify'))
+    expect(JSON.parse(String(verifyCalls.at(-1)?.[1]?.body))).toEqual({ challenge_token: 'challenge-abc', otp: '123456' })
+  })
 })

@@ -1,5 +1,5 @@
-from __future__ import annotations
-
+# No `from __future__ import annotations` here: slowapi wraps the login handler, and FastAPI can't
+# resolve string annotations through that wrapper (the body would be read as a query parameter).
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
 
 from app.core.config import settings
@@ -9,16 +9,19 @@ from app.db.models import User
 from app.dependencies import get_current_user, get_email_service, get_uow
 from app.repositories.unit_of_work import UnitOfWork
 from app.schemas.auth import (
+    ChallengeResponse,
     ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
+    ResendChallengeRequest,
     ResetPasswordRequest,
     TokenResponse,
+    VerifyChallengeRequest,
     VerifyOTPRequest,
     VerifyOTPResponse,
 )
 from app.schemas.common import MessageOut
-from app.services.auth_service import AuthService, Session
+from app.services.auth_service import AuthService, Challenge, Session
 from app.services.email_service import EmailService
 from app.services.mappers import user_out
 
@@ -63,21 +66,50 @@ def _token_response(session: Session) -> TokenResponse:
     )
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(data: RegisterRequest, request: Request, response: Response,
-                   uow: UnitOfWork = Depends(get_uow)) -> TokenResponse:
-    session = await AuthService(uow).register(data, request.headers.get("user-agent"))
-    set_refresh_cookie(response, session.refresh_token or "")
-    return _token_response(session)
+def challenge_response(challenge: Challenge, background: BackgroundTasks, email: EmailService) -> ChallengeResponse:
+    """Queue the code email and describe the pending step. Shared with the password-change route."""
+    background.add_task(email.send_otp, challenge.user.email, challenge.otp, challenge.purpose)
+    return ChallengeResponse(
+        challenge_token=challenge.token,
+        purpose=challenge.purpose,  # type: ignore[arg-type]
+        email=challenge.user.email,
+        expires_in=settings.OTP_EXPIRE_MINUTES * 60,
+        resend_after=settings.OTP_RESEND_COOLDOWN_SECONDS,
+    )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/register", response_model=ChallengeResponse, status_code=status.HTTP_202_ACCEPTED)
+async def register(data: RegisterRequest, background: BackgroundTasks, uow: UnitOfWork = Depends(get_uow),
+                   email: EmailService = Depends(get_email_service)) -> ChallengeResponse:
+    """Step 1 of sign-up. The account is usable once the emailed code is sent to /otp/verify."""
+    return challenge_response(await AuthService(uow).register(data), background, email)
+
+
+@router.post("/login", response_model=ChallengeResponse)
 @limiter.limit(LOGIN_LIMIT)
-async def login(request: Request, response: Response, data: LoginRequest,
-                uow: UnitOfWork = Depends(get_uow)) -> TokenResponse:
-    session = await AuthService(uow).login(data.email, data.password, request.headers.get("user-agent"))
+async def login(request: Request, response: Response, data: LoginRequest, background: BackgroundTasks,
+                uow: UnitOfWork = Depends(get_uow),
+                email: EmailService = Depends(get_email_service)) -> ChallengeResponse:
+    """Step 1 of sign-in: checks the password and emails a code."""
+    return challenge_response(await AuthService(uow).login(data.email, data.password), background, email)
+
+
+@router.post("/otp/verify", response_model=TokenResponse)
+@limiter.limit(LOGIN_LIMIT)
+async def verify_challenge(request: Request, response: Response, data: VerifyChallengeRequest,
+                           uow: UnitOfWork = Depends(get_uow)) -> TokenResponse:
+    """Step 2 of sign-in / sign-up: exchanges the emailed code for a session."""
+    session = await AuthService(uow).verify_challenge(data.challenge_token, data.otp,
+                                                      request.headers.get("user-agent"))
     set_refresh_cookie(response, session.refresh_token or "")
     return _token_response(session)
+
+
+@router.post("/otp/resend", response_model=ChallengeResponse)
+async def resend_challenge(data: ResendChallengeRequest, background: BackgroundTasks,
+                           uow: UnitOfWork = Depends(get_uow),
+                           email: EmailService = Depends(get_email_service)) -> ChallengeResponse:
+    return challenge_response(await AuthService(uow).resend_challenge(data.challenge_token), background, email)
 
 
 @router.post("/refresh", response_model=TokenResponse)

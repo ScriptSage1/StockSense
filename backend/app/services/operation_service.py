@@ -1,6 +1,6 @@
 """Operations: draft lifecycle, reference numbers, and the atomic validate/cancel logic.
 
-Validation contract (backend.md §11–12):
+Validation contract:
   * everything happens in ONE database transaction (UnitOfWork.transaction)
   * the operation row is locked (SELECT ... FOR UPDATE) and its status is checked AFTER the lock
   * every stock row touched is locked (SELECT ... FOR UPDATE) in a deterministic order

@@ -6,6 +6,7 @@ import hashlib
 import json
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, time, timedelta, timezone
 
 from app.core import cache as cache_keys
 from app.core.cache import Cache, cache as default_cache
@@ -13,7 +14,9 @@ from app.core.security import utcnow
 from app.db.models import OPEN_STATUSES, OperationStatus, OperationType
 from app.repositories.operation_repo import OperationFilters
 from app.repositories.unit_of_work import UnitOfWork
-from app.schemas.dashboard import DashboardSummary, LowStockItem, StatusCounts, TypeBreakdown
+from app.schemas.dashboard import DashboardSummary, FlowDay, LowStockItem, StatusCounts, TypeBreakdown
+
+FLOW_DAYS = 14
 from app.services.mappers import ledger_out, operation_summary
 
 
@@ -81,6 +84,16 @@ class DashboardService:
                                                             location_ids=location_ids)
         moves = await self.uow.ledger.recent(limit=8, location_ids=location_ids)
 
+        first_day = today - timedelta(days=FLOW_DAYS - 1)
+        flow_rows = await self.uow.ledger.daily_flow(datetime.combine(first_day, time.min, tzinfo=timezone.utc),
+                                                     location_ids)
+        by_day = {d: (i, o) for d, i, o in flow_rows}
+        stock_flow = []
+        for n in range(FLOW_DAYS):
+            d = first_day + timedelta(days=n)
+            inbound, outbound = by_day.get(d, (0.0, 0.0))
+            stock_flow.append(FlowDay(day=d, inbound=inbound, outbound=outbound))
+
         def tb(t: OperationType) -> TypeBreakdown:
             return TypeBreakdown(**breakdown.get(t.value, {}))
 
@@ -109,5 +122,6 @@ class DashboardService:
             ],
             pending_operations=[operation_summary(p, stats.get(p.id, (0, 0.0)), today) for p in pending],
             recent_moves=[ledger_out(e) for e in moves],
+            stock_flow=stock_flow,
             generated_at=utcnow(),
         )

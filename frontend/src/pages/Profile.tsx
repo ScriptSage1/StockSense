@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -11,9 +12,12 @@ import { Field, Input, PasswordInput } from '@/components/ui/Input'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { FormAlert } from '@/features/auth/FormAlert'
+import { OtpStep } from '@/features/auth/OtpStep'
 import { newPassword } from '@/features/auth/schemas'
+import { stepMotion } from '@/layouts/AuthLayout'
 import { applyFieldErrors, errorMessage } from '@/lib/errors'
 import { formatDate, initials } from '@/lib/utils'
+import type { Challenge } from '@/types/api'
 
 const nameSchema = z.object({ full_name: z.string().trim().min(2, 'At least 2 characters').max(120) })
 const passwordSchema = z
@@ -24,6 +28,8 @@ export default function Profile() {
   const { user, setUser } = useAuth()
   const [nameError, setNameError] = useState<string | null>(null)
   const [pwError, setPwError] = useState<string | null>(null)
+  // Step 2 of a password change: the emailed code. The new password waits here in memory only.
+  const [pending, setPending] = useState<{ challenge: Challenge; newPassword: string } | null>(null)
 
   const nameForm = useForm<z.infer<typeof nameSchema>>({ resolver: zodResolver(nameSchema), defaultValues: { full_name: user?.full_name ?? '' } })
   const pwForm = useForm<z.infer<typeof passwordSchema>>({
@@ -52,13 +58,18 @@ export default function Profile() {
   const savePassword = pwForm.handleSubmit(async (v) => {
     setPwError(null)
     try {
-      await usersApi.updateMe({ current_password: v.current_password, new_password: v.new_password })
-      pwForm.reset()
-      toast.success('Password changed', { description: 'Other sessions were signed out.' })
+      const challenge = await usersApi.startPasswordChange(v.current_password)
+      setPending({ challenge, newPassword: v.new_password })
     } catch (err) {
       if (!applyFieldErrors(err, pwForm.setError)) setPwError(errorMessage(err))
     }
   })
+
+  const passwordChanged = () => {
+    setPending(null)
+    pwForm.reset()
+    toast.success('Password changed', { description: 'Other sessions were signed out.' })
+  }
 
   return (
     <>
@@ -106,8 +117,38 @@ export default function Profile() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader title="Password" description="Changing it signs out your other sessions." />
-          <form onSubmit={savePassword} noValidate className="grid gap-4 p-5 sm:grid-cols-2">
+          <CardHeader
+            title="Password"
+            description={
+              pending
+                ? 'Enter the code we emailed you to confirm the change.'
+                : 'Changing it needs a code from your email and signs out your other sessions.'
+            }
+          />
+          <AnimatePresence mode="wait" initial={false}>
+          {pending ? (
+            <motion.div key="code" {...stepMotion} className="p-5">
+              <div className="mx-auto max-w-sm">
+                <OtpStep
+                  challenge={pending.challenge}
+                  onChallengeChange={(challenge) => setPending((p) => (p ? { ...p, challenge } : p))}
+                  verify={(otp) =>
+                    usersApi.confirmPasswordChange({
+                      challenge_token: pending.challenge.challenge_token,
+                      otp,
+                      new_password: pending.newPassword,
+                    })
+                  }
+                  onDone={passwordChanged}
+                  onBack={() => setPending(null)}
+                  backLabel="Cancel"
+                  submitLabel="Confirm change"
+                  successLabel="Password changed"
+                />
+              </div>
+            </motion.div>
+          ) : (
+          <motion.form key="form" {...stepMotion} onSubmit={savePassword} noValidate className="grid gap-4 p-5 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <FormAlert>{pwError}</FormAlert>
             </div>
@@ -122,10 +163,12 @@ export default function Profile() {
             </Field>
             <div className="flex justify-end sm:col-span-2">
               <Button type="submit" variant="primary" loading={pwForm.formState.isSubmitting}>
-                Change password
+                Send code
               </Button>
             </div>
-          </form>
+          </motion.form>
+          )}
+          </AnimatePresence>
         </Card>
       </div>
     </>

@@ -44,7 +44,7 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileTopbar />
         <main id="main" className="flex-1 lg:py-2 lg:pr-2">
-          <div className="print-full min-h-[calc(100vh-1rem)] bg-panel lg:rounded-xl lg:border lg:border-border lg:shadow-xs">
+          <div className="print-full min-h-[calc(100vh-1rem)] bg-canvas lg:rounded-xl lg:border lg:border-border lg:shadow-xs">
             <motion.div
               key={location.pathname}
               initial={reduce ? false : { opacity: 0, y: 6 }}

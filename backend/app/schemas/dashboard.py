@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -37,6 +37,12 @@ class StatusCounts(BaseModel):
     canceled: int = 0
 
 
+class FlowDay(BaseModel):
+    day: date
+    inbound: float
+    outbound: float
+
+
 class DashboardSummary(BaseModel):
     # KPI tiles
     total_products: int
@@ -57,4 +63,6 @@ class DashboardSummary(BaseModel):
     low_stock_items: list[LowStockItem]
     pending_operations: list[OperationSummary]
     recent_moves: list[LedgerEntryOut]
+    # One entry per day for the last FLOW_DAYS days (oldest first, zero-filled).
+    stock_flow: list[FlowDay] = []
     generated_at: datetime

@@ -1,5 +1,5 @@
 """Redis client + helpers. Every call degrades gracefully: on Redis failure the caller falls
-through to PostgreSQL (backend.md §13)."""
+through to PostgreSQL."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ log = get_logger(__name__)
 
 _client: aioredis.Redis | None = None
 
-# Cache keys and TTLs (seconds) from backend.md §13.
+# Cache keys and TTLs (seconds).
 WAREHOUSES_KEY = "warehouses:all"
 CATEGORIES_KEY = "categories:all"
 DASHBOARD_PREFIX = "dashboard:summary"

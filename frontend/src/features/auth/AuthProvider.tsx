@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { refreshSession } from '@/api/client'
 import { authApi } from '@/api/endpoints'
 import { tokenStore } from '@/lib/auth-store'
-import type { TokenResponse, User } from '@/types/api'
+import type { Challenge, TokenResponse, User } from '@/types/api'
 
 type Status = 'loading' | 'authenticated' | 'anonymous'
 
@@ -13,8 +13,12 @@ interface AuthContextValue {
   isManager: boolean
   /** True when the last session ended because refresh failed (vs. explicit logout). */
   sessionExpired: boolean
-  login: (email: string, password: string) => Promise<User>
-  register: (fullName: string, email: string, password: string) => Promise<User>
+  /** Step 1 of sign-in: checks the password; a code is emailed. */
+  login: (email: string, password: string) => Promise<Challenge>
+  /** Step 1 of sign-up: a code is emailed to confirm the address. */
+  register: (fullName: string, email: string, password: string) => Promise<Challenge>
+  /** Step 2: accept the session returned by verifying the emailed code. */
+  completeSignIn: (session: TokenResponse) => User
   logout: () => Promise<void>
   setUser: (user: User) => void
 }
@@ -60,15 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [qc],
   )
 
-  const login = useCallback(
-    async (email: string, password: string) => accept(await authApi.login(email, password)),
-    [accept],
-  )
+  const login = useCallback((email: string, password: string) => authApi.login(email, password), [])
 
   const register = useCallback(
-    async (fullName: string, email: string, password: string) =>
-      accept(await authApi.register(fullName, email, password)),
-    [accept],
+    (fullName: string, email: string, password: string) => authApi.register(fullName, email, password),
+    [],
   )
 
   const logout = useCallback(async () => {
@@ -92,10 +92,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionExpired,
       login,
       register,
+      completeSignIn: accept,
       logout,
       setUser: setUserState,
     }),
-    [status, user, sessionExpired, login, register, logout],
+    [status, user, sessionExpired, login, register, accept, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

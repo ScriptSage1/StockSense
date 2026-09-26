@@ -1,3 +1,4 @@
+import { motion, useAnimationControls, useReducedMotion } from 'framer-motion'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { authApi } from '@/api/endpoints'
@@ -14,6 +15,8 @@ export default function VerifyOtp() {
   const navigate = useNavigate()
   const location = useLocation()
   const initialEmail = (location.state as { email?: string } | null)?.email ?? ''
+  const reduce = useReducedMotion()
+  const shake = useAnimationControls()
   const [email, setEmail] = useState(initialEmail)
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +50,7 @@ export default function VerifyOtp() {
       navigate('/reset-password', { replace: true, state: { resetToken: reset_token } })
     } catch (err) {
       setError(errorMessage(err, 'Could not verify the code.'))
+      if (!reduce) void shake.start({ x: [0, -9, 9, -6, 6, -3, 0], transition: { duration: 0.42 } })
       if (isApiError(err, 'OTP_EXPIRED') || isApiError(err, 'OTP_MAX_ATTEMPTS')) setMustResend(true)
       setCode('')
     } finally {
@@ -96,13 +100,15 @@ export default function VerifyOtp() {
             <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
         )}
-        <OtpInput
-          value={code}
-          onChange={setCode}
-          invalid={Boolean(error)}
-          disabled={submitting || mustResend}
-          onComplete={(v) => void verify(v)}
-        />
+        <motion.div animate={shake}>
+          <OtpInput
+            value={code}
+            onChange={setCode}
+            invalid={Boolean(error)}
+            disabled={submitting || mustResend}
+            onComplete={(v) => void verify(v)}
+          />
+        </motion.div>
         <Button type="submit" variant="primary" className="w-full" loading={submitting} disabled={mustResend}>
           Verify
         </Button>

@@ -254,7 +254,8 @@ function OperationEditor({ type, op }: { type: OperationType; op: Operation | nu
         }
       />
 
-      <div className="no-print mb-5 overflow-x-auto">
+      {/* Vertical padding (cancelled by negative margin) leaves room for the Done burst. */}
+      <div className="no-print -my-5 mb-0 overflow-x-auto py-5">
         <StatusStepper type={type} status={op ? op.status : 'new'} />
       </div>
 

@@ -36,7 +36,13 @@ export function KpiTile({
       >
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2 text-[13px] font-medium text-muted">
-            <Icon className={cn('h-4 w-4', tone === 'alert' && value > 0 ? 'text-emphasis' : 'text-subtle')} aria-hidden />
+            <Icon
+              className={cn(
+                'h-4 w-4 transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-110',
+                tone === 'alert' && value > 0 ? 'text-emphasis' : 'text-subtle',
+              )}
+              aria-hidden
+            />
             {label}
           </span>
           <ArrowUpRight

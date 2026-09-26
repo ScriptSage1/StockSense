@@ -1,6 +1,7 @@
 import { api, request } from '@/api/client'
 import type {
   Category,
+  Challenge,
   DashboardSummary,
   LedgerEntry,
   Location,
@@ -26,10 +27,17 @@ import type {
 
 // ---------------------------------------------------------------- auth
 export const authApi = {
+  /** Step 1: checks the password and emails a code. */
   login: (email: string, password: string) =>
-    request<TokenResponse>('/auth/login', { method: 'POST', body: { email, password }, auth: false }),
+    request<Challenge>('/auth/login', { method: 'POST', body: { email, password }, auth: false }),
+  /** Step 1: creates the (unverified) account and emails a code. */
   register: (full_name: string, email: string, password: string) =>
-    request<TokenResponse>('/auth/register', { method: 'POST', body: { full_name, email, password }, auth: false }),
+    request<Challenge>('/auth/register', { method: 'POST', body: { full_name, email, password }, auth: false }),
+  /** Step 2 of sign-in / sign-up: the code for a session. */
+  verifyChallenge: (challenge_token: string, otp: string) =>
+    request<TokenResponse>('/auth/otp/verify', { method: 'POST', body: { challenge_token, otp }, auth: false }),
+  resendChallenge: (challenge_token: string) =>
+    request<Challenge>('/auth/otp/resend', { method: 'POST', body: { challenge_token }, auth: false }),
   logout: () => api.post<Message>('/auth/logout'),
   forgotPassword: (email: string) =>
     request<Message>('/auth/forgot-password', { method: 'POST', body: { email }, auth: false }),
@@ -46,8 +54,12 @@ export const authApi = {
 // ---------------------------------------------------------------- users
 export const usersApi = {
   me: () => api.get<User>('/users/me'),
-  updateMe: (body: { full_name?: string; current_password?: string; new_password?: string }) =>
-    api.put<User>('/users/me', body),
+  updateMe: (body: { full_name?: string }) => api.put<User>('/users/me', body),
+  /** Password change step 1: confirms the current password and emails a code. */
+  startPasswordChange: (current_password: string) =>
+    api.post<Challenge>('/users/me/password/otp', { current_password }),
+  confirmPasswordChange: (body: { challenge_token: string; otp: string; new_password: string }) =>
+    api.post<User>('/users/me/password', body),
   list: () => api.get<User[]>('/users'),
   update: (id: string, body: { role?: Role; is_active?: boolean }) => api.put<User>(`/users/${id}`, body),
 }

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from typing import AsyncIterator
 
 # Must be configured before the app is imported.
@@ -22,6 +23,7 @@ os.environ["REDIS_URL"] = os.environ.get("TEST_REDIS_URL", "redis://localhost:63
 os.environ.setdefault("APP_ENV", "development")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-that-is-long-enough-123")
 os.environ.setdefault("FRONTEND_ORIGIN", "http://localhost:5173")
+os.environ.setdefault("BCRYPT_ROUNDS", "4")  # tests hash constantly; production keeps the default cost
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402
@@ -135,6 +137,7 @@ async def client(db_session: AsyncSession, mailbox: CapturingProvider) -> AsyncI
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="https://testserver",
                                  headers={"Origin": ORIGIN}) as ac:
+        ac.mailbox = mailbox  # type: ignore[attr-defined]  # lets helpers read emailed codes
         yield ac
     app.dependency_overrides.clear()
 
@@ -143,10 +146,33 @@ async def client(db_session: AsyncSession, mailbox: CapturingProvider) -> AsyncI
 PASSWORD = "Passw0rd!"
 
 
+def last_code(client: httpx.AsyncClient) -> str:
+    """The 6-digit code from the most recent captured email."""
+    return re.search(r"\b(\d{6})\b", client.mailbox.sent[-1].text).group(1)  # type: ignore[attr-defined]
+
+
+async def verify(client: httpx.AsyncClient, challenge: dict, code: str | None = None) -> httpx.Response:
+    """Step 2 of sign-in / sign-up. Without `code`, uses the most recently emailed one."""
+    return await client.post("/api/v1/auth/otp/verify",
+                             json={"challenge_token": challenge["challenge_token"], "otp": code or last_code(client)})
+
+
 async def register(client: httpx.AsyncClient, email: str, name: str = "Test User") -> dict:
+    """Sign-up including the emailed-code step; returns the token response."""
     r = await client.post("/api/v1/auth/register", json={"full_name": name, "email": email, "password": PASSWORD})
-    assert r.status_code == 201, r.text
-    return r.json()
+    assert r.status_code == 202, r.text
+    v = await verify(client, r.json())
+    assert v.status_code == 200, v.text
+    return v.json()
+
+
+async def login(client: httpx.AsyncClient, email: str, password: str = PASSWORD) -> dict:
+    """Sign-in including the emailed-code step; returns the token response."""
+    r = await client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert r.status_code == 200, r.text
+    v = await verify(client, r.json())
+    assert v.status_code == 200, v.text
+    return v.json()
 
 
 def auth(token: str) -> dict[str, str]:

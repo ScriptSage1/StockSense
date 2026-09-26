@@ -4,23 +4,24 @@
 
 /*
  * StockSense design tokens.
- * Brand: charcoal #2C2C2C · maroon #853953 · plum #612D53 · surface #F3F4F4
+ * Brand: charcoal #2C2C2C · maroon #853953 · plum #612D53 on a warm beige canvas.
  * Charcoal is the dominant neutral; plum drives interaction; maroon marks emphasis.
  */
 @layer base {
   :root {
-    --bg: 243 244 244;           /* #F3F4F4 app canvas */
-    --surface: 248 248 248;      /* subtle wells inside panels */
-    --panel: 255 255 255;        /* content panels */
-    --border: 228 228 231;
-    --border-strong: 212 212 216;
+    --bg: 233 225 210;           /* #E9E1D2 outer frame (sidebar, auth backdrop) */
+    --canvas: 243 237 226;       /* #F3EDE2 beige page background */
+    --surface: 246 241 232;      /* #F6F1E8 subtle wells inside panels */
+    --panel: 252 250 245;        /* #FCFAF5 cards, inputs, dialogs (warm cream) */
+    --border: 226 217 201;       /* #E2D9C9 */
+    --border-strong: 209 198 179;
     --fg: 44 44 44;              /* #2C2C2C */
-    --muted: 107 107 112;
-    --subtle: 150 150 156;
+    --muted: 106 99 89;
+    --subtle: 148 139 126;
 
     --accent: 97 45 83;          /* #612D53 plum */
     --accent-hover: 82 36 70;
-    --accent-soft: 245 237 242;
+    --accent-soft: 243 231 234;
     --emphasis: 133 57 83;       /* #853953 maroon */
 
     --success: 36 121 84;
@@ -37,10 +38,20 @@
     --radius-lg: 12px;
     --radius-xl: 16px;
 
-    --shadow-xs: 0 1px 1px rgb(20 20 20 / 0.04);
-    --shadow-sm: 0 1px 2px rgb(20 20 20 / 0.05), 0 1px 1px rgb(20 20 20 / 0.03);
-    --shadow-md: 0 4px 12px -2px rgb(20 20 20 / 0.08), 0 2px 4px -2px rgb(20 20 20 / 0.05);
-    --shadow-lg: 0 16px 40px -12px rgb(20 20 20 / 0.22), 0 4px 12px -4px rgb(20 20 20 / 0.08);
+    /* Chart colours (validated for contrast and colour-blind separation on --panel). */
+    --viz-in: 47 111 179;        /* #2f6fb3 units in */
+    --viz-out: 133 57 83;        /* #853953 units out (brand maroon) */
+    --viz-good: 18 135 90;       /* #12875a healthy */
+    --viz-warn: 214 145 0;       /* #d69100 low / waiting */
+    --viz-bad: 184 50 44;        /* #b8322c out of stock / late */
+    --viz-neutral: 199 191 178;  /* #c7bfb2 draft (de-emphasised) */
+    --viz-ready: 47 111 179;     /* #2f6fb3 ready */
+
+    /* Shadows are tinted brown so they sit naturally on beige. */
+    --shadow-xs: 0 1px 1px rgb(60 40 20 / 0.05);
+    --shadow-sm: 0 1px 2px rgb(60 40 20 / 0.07), 0 1px 1px rgb(60 40 20 / 0.04);
+    --shadow-md: 0 6px 16px -4px rgb(60 40 20 / 0.12), 0 2px 4px -2px rgb(60 40 20 / 0.06);
+    --shadow-lg: 0 18px 44px -12px rgb(60 40 20 / 0.26), 0 4px 12px -4px rgb(60 40 20 / 0.1);
 
     color-scheme: light;
   }
@@ -87,7 +98,7 @@
   .skeleton::after {
     content: '';
     @apply absolute inset-0 -translate-x-full animate-shimmer;
-    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.6), transparent);
+    background: linear-gradient(90deg, transparent, rgb(255 252 245 / 0.65), transparent);
   }
   .scrollbar-thin {
     scrollbar-width: thin;

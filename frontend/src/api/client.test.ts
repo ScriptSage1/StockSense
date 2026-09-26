@@ -15,7 +15,10 @@ const tokenBody = (token: string) => ({
 describe('api client auth handling', () => {
   const fetchMock = vi.fn<typeof fetch>()
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // refreshSession() releases its single-flight promise on the next tick; let the previous
+    // test's refresh clear so it isn't shared into this one.
+    await new Promise((resolve) => setTimeout(resolve, 0))
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
     tokenStore.clear()

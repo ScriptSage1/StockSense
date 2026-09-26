@@ -41,7 +41,17 @@ class SMTPProvider:
         msg["Subject"] = message.subject
         msg.set_content(message.text)
         msg.add_alternative(message.html, subtype="html")
-        await aiosmtplib.send(msg, hostname=self.cfg.SMTP_HOST, port=self.cfg.SMTP_PORT, timeout=10)
+        cfg = self.cfg
+        await aiosmtplib.send(
+            msg,
+            hostname=cfg.SMTP_HOST,
+            port=cfg.SMTP_PORT,
+            username=cfg.SMTP_USERNAME or None,
+            password=cfg.SMTP_PASSWORD or None,
+            use_tls=cfg.SMTP_SECURITY == "ssl",
+            start_tls=True if cfg.SMTP_SECURITY == "starttls" else False,
+            timeout=15,
+        )
 
 
 class SendGridProvider:
@@ -76,6 +86,15 @@ def _layout(title: str, body_html: str) -> str:
 </table></td></tr></table></body></html>"""
 
 
+# purpose -> (subject, heading, "Use this code to ...")
+_OTP_COPY = {
+    "password_reset": ("Your StockSense reset code", "Reset your password", "reset your password"),
+    "login": ("Your StockSense sign-in code", "Sign in to StockSense", "sign in"),
+    "register": ("Confirm your StockSense account", "Confirm your email", "finish creating your account"),
+    "password_change": ("Confirm your password change", "Change your password", "confirm your new password"),
+}
+
+
 class EmailService:
     def __init__(self, provider: EmailProvider) -> None:
         self.provider = provider
@@ -87,17 +106,18 @@ class EmailService:
         except Exception as exc:  # background task: never crash the worker
             log.error("email.failed", to=message.to, subject=message.subject, error=str(exc))
 
-    async def send_otp(self, to: str, otp: str) -> None:
+    async def send_otp(self, to: str, otp: str, purpose: str = "password_reset") -> None:
         minutes = settings.OTP_EXPIRE_MINUTES
+        subject, title, action = _OTP_COPY.get(purpose, _OTP_COPY["password_reset"])
         await self._deliver(
             OutgoingEmail(
                 to=to,
-                subject="Your StockSense reset code",
-                text=f"Your password reset code is {otp}. It expires in {minutes} minutes.\n"
+                subject=subject,
+                text=f"Your code to {action} is {otp}. It expires in {minutes} minutes.\n"
                 "If you did not request this, you can ignore this email.",
                 html=_layout(
-                    "Reset your password",
-                    f"<p>Use this code to reset your password:</p>"
+                    title,
+                    f"<p>Use this code to {action}:</p>"
                     f"<p style=\"font-size:28px;letter-spacing:6px;font-weight:600;color:#2C2C2C\">{otp}</p>"
                     f"<p style=\"color:#71717a\">Expires in {minutes} minutes. If you did not request this, ignore this email.</p>",
                 ),

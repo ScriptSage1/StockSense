@@ -31,22 +31,37 @@ function Leaf({ item, collapsed, nested, onNavigate }: { item: NavLeaf; collapse
           itemBase,
           nested && !collapsed && 'pl-9 text-[13px]',
           collapsed && 'justify-center px-0',
-          isActive ? 'bg-panel text-fg shadow-sm' : 'text-muted hover:bg-fg/[0.04] hover:text-fg',
+          isActive ? 'text-fg' : 'text-muted hover:bg-fg/[0.04] hover:text-fg',
         )
       }
     >
       {({ isActive }) => (
         <>
-          {(!nested || collapsed) && (
-            <Icon className={cn('h-[18px] w-[18px] shrink-0', isActive ? 'text-accent' : 'text-subtle group-hover:text-muted')} aria-hidden />
-          )}
-          {nested && !collapsed && (
-            <span
-              className={cn('absolute left-[18px] h-1.5 w-1.5 rounded-full', isActive ? 'bg-accent' : 'bg-border-strong')}
+          {isActive && (
+            // The highlight glides between items instead of jumping.
+            <motion.span
+              layoutId="sidebar-active"
+              className="absolute inset-0 -z-0 rounded-md bg-panel shadow-sm"
+              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
               aria-hidden
             />
           )}
-          {!collapsed && <span className="truncate">{item.label}</span>}
+          {(!nested || collapsed) && (
+            <Icon
+              className={cn(
+                'relative h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110',
+                isActive ? 'text-accent' : 'text-subtle group-hover:text-muted',
+              )}
+              aria-hidden
+            />
+          )}
+          {nested && !collapsed && (
+            <span
+              className={cn('absolute left-[18px] z-10 h-1.5 w-1.5 rounded-full', isActive ? 'bg-accent' : 'bg-border-strong')}
+              aria-hidden
+            />
+          )}
+          {!collapsed && <span className="relative truncate">{item.label}</span>}
           {collapsed && <span className="sr-only">{item.label}</span>}
         </>
       )}

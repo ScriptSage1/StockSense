@@ -58,6 +58,29 @@ class TokenResponse(BaseModel):
     user: UserOut
 
 
+OTPPurpose = Literal["login", "register", "password_change"]
+
+
+class ChallengeResponse(BaseModel):
+    """Step 1 of sign-in, sign-up and password change: a code was emailed; send it back with
+    the challenge token."""
+
+    challenge_token: str
+    purpose: OTPPurpose
+    email: str
+    expires_in: int
+    resend_after: int
+
+
+class VerifyChallengeRequest(BaseModel):
+    challenge_token: str = Field(min_length=10)
+    otp: str = Field(pattern=r"^\d{6}$")
+
+
+class ResendChallengeRequest(BaseModel):
+    challenge_token: str = Field(min_length=10)
+
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
@@ -84,13 +107,21 @@ class ResetPasswordRequest(BaseModel):
 
 class UserUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=120)
-    current_password: str | None = Field(default=None, max_length=128)
-    new_password: str | None = Field(default=None, max_length=128)
+
+
+class PasswordChangeStart(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+
+
+class PasswordChangeConfirm(BaseModel):
+    challenge_token: str = Field(min_length=10)
+    otp: str = Field(pattern=r"^\d{6}$")
+    new_password: str = Field(max_length=128)
 
     @field_validator("new_password")
     @classmethod
-    def _pw(cls, v: str | None) -> str | None:
-        return None if v is None else _check_password(v)
+    def _pw(cls, v: str) -> str:
+        return _check_password(v)
 
 
 class RoleUpdate(BaseModel):

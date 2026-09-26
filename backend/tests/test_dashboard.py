@@ -48,6 +48,31 @@ async def test_summary_aggregation(client, manager, world) -> None:
     assert f["status_counts"]["ready"] + f["status_counts"]["waiting"] == 2
 
 
+async def test_stock_flow_counts_units_in_and_out_per_day(client, manager, world) -> None:
+    h = manager["headers"]
+    await receive(client, h, world["loc_a"]["id"], world["desk"]["id"], 7)
+    for payload in (
+        {"type": "delivery", "source_location_id": world["loc_a"]["id"]},
+        {"type": "transfer", "source_location_id": world["loc_a"]["id"],
+         "destination_location_id": world["loc_b"]["id"]},
+    ):
+        qty = 2 if payload["type"] == "delivery" else 1
+        op = await create_op(client, h, lines=[{"product_id": world["desk"]["id"], "quantity": qty}], **payload)
+        assert (await client.post(f"{API}/{op['id']}/validate", headers=h)).status_code == 200
+
+    s = (await client.get("/api/v1/dashboard/summary", headers=h)).json()
+    flow = s["stock_flow"]
+    assert len(flow) == 14 and flow[0]["day"] < flow[-1]["day"]
+    assert sum(d["inbound"] for d in flow[:-1]) == 0
+    # Transfers only move stock around, so the whole-workspace view leaves them out.
+    assert flow[-1]["inbound"] == 7 and flow[-1]["outbound"] == 2
+
+    # Scoped to the destination location, the transfer is an arrival.
+    b = (await client.get("/api/v1/dashboard/summary", headers=h,
+                          params={"location_id": world["loc_b"]["id"]})).json()
+    assert b["stock_flow"][-1]["inbound"] == 1 and b["stock_flow"][-1]["outbound"] == 0
+
+
 async def test_summary_cache_invalidated_by_validation(client, manager, world) -> None:
     h = manager["headers"]
     first = (await client.get("/api/v1/dashboard/summary", headers=h)).json()

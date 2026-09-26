@@ -23,8 +23,16 @@ class UserRepository(BaseRepository[User]):
     async def count(self) -> int:
         return int(await self.session.scalar(select(func.count(User.id))) or 0)
 
+    async def count_verified(self, exclude_id: uuid.UUID | None = None) -> int:
+        stmt = select(func.count(User.id)).where(User.email_verified_at.is_not(None))
+        if exclude_id is not None:
+            stmt = stmt.where(User.id != exclude_id)
+        return int(await self.session.scalar(stmt) or 0)
+
     async def list_all(self) -> Sequence[User]:
-        return (await self.session.scalars(select(User).order_by(User.full_name))).all()
+        # Sign-ups that never confirmed their email are not members yet.
+        stmt = select(User).where(User.email_verified_at.is_not(None)).order_by(User.full_name)
+        return (await self.session.scalars(stmt)).all()
 
     async def list_active_managers(self) -> Sequence[User]:
         stmt = select(User).where(User.role == UserRole.manager, User.is_active.is_(True))

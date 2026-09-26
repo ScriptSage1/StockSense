@@ -12,17 +12,17 @@ from app.repositories.base import BaseRepository
 class OTPRepository(BaseRepository[OTPRecord]):
     model = OTPRecord
 
-    async def invalidate_previous(self, user_id: uuid.UUID) -> None:
-        await self.session.execute(
-            update(OTPRecord)
-            .where(OTPRecord.user_id == user_id, OTPRecord.is_used.is_(False))
-            .values(is_used=True)
-        )
+    async def invalidate_previous(self, user_id: uuid.UUID, purpose: str | None = None) -> None:
+        """Burn unused codes for the user (for one purpose, or all of them when purpose is None)."""
+        stmt = update(OTPRecord).where(OTPRecord.user_id == user_id, OTPRecord.is_used.is_(False))
+        if purpose is not None:
+            stmt = stmt.where(OTPRecord.purpose == purpose)
+        await self.session.execute(stmt.values(is_used=True))
 
-    async def latest_active_for_update(self, user_id: uuid.UUID) -> OTPRecord | None:
+    async def latest_active_for_update(self, user_id: uuid.UUID, purpose: str) -> OTPRecord | None:
         stmt = (
             select(OTPRecord)
-            .where(OTPRecord.user_id == user_id, OTPRecord.is_used.is_(False))
+            .where(OTPRecord.user_id == user_id, OTPRecord.purpose == purpose, OTPRecord.is_used.is_(False))
             .order_by(OTPRecord.created_at.desc())
             .limit(1)
             .with_for_update()
@@ -30,9 +30,15 @@ class OTPRepository(BaseRepository[OTPRecord]):
         )
         return await self.session.scalar(stmt)
 
-    async def count_created_since(self, user_id: uuid.UUID, since: datetime) -> int:
+    async def latest_created_at(self, user_id: uuid.UUID, purpose: str) -> datetime | None:
+        stmt = select(func.max(OTPRecord.created_at)).where(
+            OTPRecord.user_id == user_id, OTPRecord.purpose == purpose
+        )
+        return await self.session.scalar(stmt)
+
+    async def count_created_since(self, user_id: uuid.UUID, since: datetime, purpose: str) -> int:
         stmt = select(func.count(OTPRecord.id)).where(
-            OTPRecord.user_id == user_id, OTPRecord.created_at >= since
+            OTPRecord.user_id == user_id, OTPRecord.purpose == purpose, OTPRecord.created_at >= since
         )
         return int(await self.session.scalar(stmt) or 0)
 

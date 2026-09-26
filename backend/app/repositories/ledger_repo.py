@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Sequence
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, case, func, or_, select
 
 from app.db.models import LedgerEntry, Operation, OperationType, Product
 from app.repositories.base import BaseRepository
@@ -80,3 +80,34 @@ class LedgerRepository(BaseRepository[LedgerEntry]):
                 or_(LedgerEntry.from_location_id.in_(location_ids), LedgerEntry.to_location_id.in_(location_ids))
             )
         return (await self.session.scalars(stmt)).unique().all()
+
+    async def daily_flow(self, since: datetime, location_ids: Sequence[uuid.UUID] | None = None
+                         ) -> list[tuple[date, float, float]]:
+        """Units in and units out per UTC day since `since`. Without a location scope, transfers are
+        left out (they only move stock around). With one, a transfer counts where it crosses the scope."""
+        day = func.date(func.timezone("UTC", LedgerEntry.performed_at))
+        q = LedgerEntry.quantity
+        if location_ids is None:
+            in_cond = q > 0
+            out_cond = q < 0
+        else:
+            in_cond = and_(q > 0, LedgerEntry.to_location_id.in_(location_ids))
+            out_cond = and_(q < 0, LedgerEntry.from_location_id.in_(location_ids))
+        stmt = (
+            select(
+                day.label("day"),
+                func.coalesce(func.sum(case((in_cond, q), else_=0)), 0).label("inbound"),
+                func.coalesce(func.sum(case((out_cond, -q), else_=0)), 0).label("outbound"),
+            )
+            .where(LedgerEntry.performed_at >= since)
+            .group_by(day)
+            .order_by(day)
+        )
+        if location_ids is None:
+            stmt = stmt.where(LedgerEntry.type != OperationType.transfer)
+        else:
+            stmt = stmt.where(
+                or_(LedgerEntry.from_location_id.in_(location_ids), LedgerEntry.to_location_id.in_(location_ids))
+            )
+        rows = (await self.session.execute(stmt)).all()
+        return [(r.day, float(r.inbound), float(r.outbound)) for r in rows]

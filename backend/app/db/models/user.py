@@ -32,6 +32,8 @@ class User(UUIDPk, Timestamped, Base):
         default=UserRole.staff,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    # Set once the owner proves they control the address with an emailed code.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     otp_records: Mapped[list["OTPRecord"]] = relationship(back_populates="user", cascade="all, delete-orphan")

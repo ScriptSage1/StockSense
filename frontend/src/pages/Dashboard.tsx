@@ -22,9 +22,13 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { TableSkeleton } from '@/components/ui/Table'
 import { FilterBar } from '@/features/dashboard/FilterBar'
-import { FlowCard } from '@/features/dashboard/FlowCard'
 import { KpiTile } from '@/features/dashboard/KpiTile'
+import { OpenWorkChart } from '@/features/dashboard/OpenWorkChart'
+import { Reveal } from '@/features/dashboard/Reveal'
 import { StatusMix } from '@/features/dashboard/StatusMix'
+import { StockFlowChart } from '@/features/dashboard/StockFlowChart'
+import { StockHealth } from '@/features/dashboard/StockHealth'
+import { StockMeter } from '@/features/dashboard/StockMeter'
 import { MovesList } from '@/features/ledger/MovesList'
 import { OPERATION_TYPES, operationPath } from '@/features/operations/config'
 import { OperationsTable } from '@/features/operations/OperationsTable'
@@ -182,22 +186,36 @@ export default function Dashboard() {
             </motion.div>
           )}
 
+          {/* At-a-glance row: health + what needs doing, and the last two weeks of movement. */}
+          <div className="mt-6 grid gap-6 lg:grid-cols-5 xl:grid-cols-3">
+            {data ? (
+              <>
+                <Reveal index={0} className="lg:col-span-2 xl:col-span-1">
+                  <StockHealth data={data} />
+                </Reveal>
+                <Reveal index={1} className="lg:col-span-3 xl:col-span-2">
+                  <StockFlowChart days={data.stock_flow} />
+                </Reveal>
+              </>
+            ) : (
+              <>
+                <Skeleton className="h-[330px] rounded-lg lg:col-span-2 xl:col-span-1" />
+                <Skeleton className="h-[330px] rounded-lg lg:col-span-3 xl:col-span-2" />
+              </>
+            )}
+          </div>
+
           <div className="mt-6 grid gap-6 xl:grid-cols-3">
             <div className="space-y-6 xl:col-span-2">
-              <div className="grid gap-3 sm:grid-cols-2">
-                {data ? (
-                  <>
-                    <FlowCard type="receipt" data={data.receipts} />
-                    <FlowCard type="delivery" data={data.deliveries} />
-                  </>
-                ) : (
-                  <>
-                    <Skeleton className="h-[164px] rounded-lg" />
-                    <Skeleton className="h-[164px] rounded-lg" />
-                  </>
-                )}
-              </div>
+              {data ? (
+                <Reveal index={2}>
+                  <OpenWorkChart data={data} hrefFor={(t, s) => opsListHref(t, s)} />
+                </Reveal>
+              ) : (
+                <Skeleton className="h-[220px] rounded-lg" />
+              )}
 
+              <Reveal index={3}>
               <Card>
                 <CardHeader
                   title={filters.status ? `${filters.status[0].toUpperCase()}${filters.status.slice(1)} operations` : 'Open operations'}
@@ -221,9 +239,11 @@ export default function Dashboard() {
                   )}
                 </div>
               </Card>
+              </Reveal>
             </div>
 
             <div className="space-y-6">
+              <Reveal index={3}>
               <Card>
                 <CardHeader
                   title="Needs attention"
@@ -248,7 +268,7 @@ export default function Dashboard() {
                   ) : (
                     <ul className="divide-y divide-border">
                       {data.low_stock_items.map((p) => (
-                        <li key={p.id}>
+                        <li key={p.id} className="pb-2.5">
                           <Link
                             to={`/products/${p.id}`}
                             className="focus-ring -mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-fg/[0.025]"
@@ -268,13 +288,16 @@ export default function Dashboard() {
                               )}
                             </div>
                           </Link>
+                          <StockMeter onHand={p.total_on_hand} reorderPoint={p.reorder_point} />
                         </li>
                       ))}
                     </ul>
                   )}
                 </CardBody>
               </Card>
+              </Reveal>
 
+              <Reveal index={4}>
               <Card>
                 <CardHeader title="Status mix" description={filters.type ? OPERATION_TYPES[filters.type].plural : 'All documents'} />
                 <CardBody>
@@ -288,7 +311,9 @@ export default function Dashboard() {
                   )}
                 </CardBody>
               </Card>
+              </Reveal>
 
+              <Reveal index={5}>
               <Card>
                 <CardHeader
                   title="Recent movement"
@@ -312,6 +337,7 @@ export default function Dashboard() {
                   )}
                 </CardBody>
               </Card>
+              </Reveal>
             </div>
           </div>
         </>

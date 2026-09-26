@@ -1,4 +1,4 @@
-"""Application settings (Pydantic Settings). Variables mirror backend.md §15."""
+"""Application settings (Pydantic Settings). Every variable is documented in README.md."""
 
 from __future__ import annotations
 
@@ -28,8 +28,16 @@ class Settings(BaseSettings):
 
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 1025
+    # Sign-in for real mail servers. Gmail: smtp.gmail.com, port 587, SMTP_SECURITY=starttls,
+    # SMTP_USERNAME=<your Gmail address>, SMTP_PASSWORD=<16-character app password>.
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    # none (local catchers like Mailhog) | starttls (port 587) | ssl (port 465)
+    SMTP_SECURITY: Literal["none", "starttls", "ssl"] = "none"
 
     OTP_REQUEST_RATE_PER_HOUR: int = 3
+    # Sign-in / sign-up / password-change codes (per email per hour, including resends).
+    OTP_AUTH_RATE_PER_HOUR: int = 10
     LOGIN_RATE_PER_15_MIN: int = 10
 
     # Constants fixed by the architecture (not environment-driven).
@@ -37,6 +45,8 @@ class Settings(BaseSettings):
     OTP_EXPIRE_MINUTES: int = 10
     OTP_MAX_ATTEMPTS: int = 5
     RESET_TOKEN_EXPIRE_MINUTES: int = 15
+    CHALLENGE_TOKEN_EXPIRE_MINUTES: int = 30
+    OTP_RESEND_COOLDOWN_SECONDS: int = 30
     BCRYPT_ROUNDS: int = 12
     REFRESH_COOKIE_NAME: str = "ss_refresh"
     REFRESH_COOKIE_PATH: str = "/api/v1/auth"
@@ -50,6 +60,21 @@ class Settings(BaseSettings):
         if v.startswith("postgresql://"):
             v = "postgresql+asyncpg://" + v[len("postgresql://") :]
         return v
+
+    @field_validator("SMTP_PASSWORD")
+    @classmethod
+    def _strip_app_password(cls, v: str) -> str:
+        # Google shows app passwords in groups ("abcd efgh ijkl mnop"); the spaces aren't part of it.
+        return "".join(v.split())
+
+    @model_validator(mode="after")
+    def _smtp_guards(self) -> "Settings":
+        if self.EMAIL_PROVIDER == "smtp" and self.SMTP_USERNAME:
+            if not self.SMTP_PASSWORD:
+                raise ValueError("SMTP_PASSWORD is required when SMTP_USERNAME is set")
+            if self.SMTP_SECURITY == "none":
+                raise ValueError("Set SMTP_SECURITY to starttls or ssl: never send SMTP credentials unencrypted")
+        return self
 
     @model_validator(mode="after")
     def _production_guards(self) -> "Settings":

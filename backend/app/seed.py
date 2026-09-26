@@ -38,7 +38,8 @@ async def _ensure_users(uow: UnitOfWork) -> dict[str, User]:
     for name, email, password, role in DEV_USERS:
         user = await uow.users.get_by_email(email)
         if user is None:
-            user = User(full_name=name, email=email, password_hash=hash_password(password), role=role)
+            user = User(full_name=name, email=email, password_hash=hash_password(password), role=role,
+                        email_verified_at=utcnow())
             await uow.users.create(user)
             print(f"  + user {email} ({role.value})")
         users[email] = user
