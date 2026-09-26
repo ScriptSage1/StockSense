@@ -6,12 +6,15 @@ export function OtpInput({
   value,
   onChange,
   invalid,
+  success,
   disabled,
   onComplete,
 }: {
   value: string
   onChange: (value: string) => void
   invalid?: boolean
+  /** Verified: the boxes turn green one after another. */
+  success?: boolean
   disabled?: boolean
   onComplete?: (value: string) => void
 }) {
@@ -67,14 +70,22 @@ export function OtpInput({
           maxLength={1}
           aria-label={`Digit ${i + 1}`}
           aria-invalid={invalid || undefined}
+          data-filled={Boolean(d)}
+          style={success ? { transitionDelay: `${i * 45}ms` } : undefined}
           autoFocus={i === 0}
           onPaste={onPaste}
           onKeyDown={(e) => onKeyDown(i, e)}
           onChange={(e) => setAt(i, e.target.value.replace(/\D/g, '').slice(-1))}
           className={cn(
-            'tabular h-12 w-full min-w-0 rounded-md border bg-panel text-center text-lg font-semibold text-fg shadow-xs transition-[border-color,box-shadow]',
+            'tabular h-12 w-full min-w-0 rounded-md border bg-panel text-center text-lg font-semibold text-fg shadow-xs',
+            'transition-[border-color,box-shadow,background-color,color] duration-200',
             'focus:border-accent/60 focus:outline-none focus:ring-[3px] focus:ring-accent/15',
-            invalid ? 'border-danger/60' : 'border-border',
+            'data-[filled=true]:animate-digit-pop',
+            success
+              ? 'border-success/50 bg-success-soft text-success'
+              : invalid
+                ? 'border-danger/60'
+                : 'border-border data-[filled=true]:border-accent/35',
           )}
         />
       ))}

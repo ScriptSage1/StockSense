@@ -10,6 +10,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, UUIDPk
 from app.db.models.user import User
 
+OTP_PURPOSES = ("password_reset", "login", "register", "password_change")
+
 
 class OTPRecord(UUIDPk, Base):
     __tablename__ = "otp_records"
@@ -17,6 +19,8 @@ class OTPRecord(UUIDPk, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    purpose: Mapped[str] = mapped_column(String(24), nullable=False, default="password_reset",
+                                         server_default="password_reset")
     otp_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     is_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
@@ -27,5 +31,7 @@ class OTPRecord(UUIDPk, Base):
 
     __table_args__ = (
         Index("ix_otp_records_user_id", "user_id"),
+        Index("ix_otp_records_user_id_purpose", "user_id", "purpose"),
         CheckConstraint("attempt_count >= 0", name="attempt_count_non_negative"),
+        CheckConstraint(f"purpose IN ({', '.join(repr(p) for p in OTP_PURPOSES)})", name="purpose_valid"),
     )

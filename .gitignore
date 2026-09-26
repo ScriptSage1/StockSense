@@ -1,0 +1,32 @@
+# Secrets: real values live only in local .env files (see the .env.example files)
+.env
+.env.*
+!.env.example
+
+# Dependencies (recreate with `pip install -r requirements.txt` / `npm install`)
+node_modules/
+.venv/
+venv/
+
+# Build output and caches
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.tsbuildinfo
+.vite/
+
+# Local runtime data: the development database and process logs
+.pgdata/
+*.log
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

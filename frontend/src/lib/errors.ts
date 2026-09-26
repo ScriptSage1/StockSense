@@ -9,6 +9,7 @@ const CODE_MESSAGES: Record<string, string> = {
   OPERATION_LOCKED: 'Only draft operations can be edited.',
   OTP_EXPIRED: 'That code has expired. Request a new one.',
   OTP_MAX_ATTEMPTS: 'Too many incorrect attempts. Request a new code.',
+  CHALLENGE_INVALID: 'This verification step has expired. Start again.',
   RESET_TOKEN_INVALID: 'This reset session is no longer valid. Start again.',
   MANAGER_REQUIRED: 'Manager access is required for this action.',
   RATE_LIMITED: 'Too many attempts. Try again in a few minutes.',
@@ -32,7 +33,7 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong. Try
   if (err instanceof NetworkError) return err.message
   if (err instanceof ApiError) {
     // Server details are written for users (e.g. INSUFFICIENT_STOCK names the product & quantities).
-    if (err.code === 'INSUFFICIENT_STOCK' || err.code === 'OTP_INVALID') return err.body.detail
+    if (['INSUFFICIENT_STOCK', 'OTP_INVALID', 'OTP_COOLDOWN'].includes(err.code)) return err.body.detail
     if (CODE_MESSAGES[err.code]) return CODE_MESSAGES[err.code]
     if (err.status >= 500) return STATUS_MESSAGES[500]
     if (err.body.detail && err.body.detail !== 'Request failed') return err.body.detail

@@ -4,11 +4,12 @@ import { STATUS_LABELS, STATUS_ORDER } from '@/features/operations/config'
 import { cn, formatQty } from '@/lib/utils'
 import type { OperationStatus } from '@/types/api'
 
+// Same stage colours as the Open work chart.
 const COLORS: Record<OperationStatus, string> = {
-  draft: 'bg-subtle/60',
-  waiting: 'bg-warning',
-  ready: 'bg-info',
-  done: 'bg-success',
+  draft: 'bg-viz-neutral',
+  waiting: 'bg-viz-warn',
+  ready: 'bg-viz-ready',
+  done: 'bg-viz-good',
   canceled: 'bg-fg/25',
 }
 
@@ -16,7 +17,7 @@ export function StatusMix({ counts, hrefFor }: { counts: Record<OperationStatus,
   const total = STATUS_ORDER.reduce((sum, s) => sum + (counts[s] ?? 0), 0)
   return (
     <div>
-      <div className="flex h-2 w-full overflow-hidden rounded-full bg-fg/[0.06]" role="img" aria-label="Operations by status">
+      <div className="flex h-2 w-full gap-[2px] overflow-hidden rounded-full bg-fg/[0.06]" role="img" aria-label="Operations by status">
         {total > 0 &&
           STATUS_ORDER.map((s) =>
             counts[s] ? (

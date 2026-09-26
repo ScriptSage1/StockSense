@@ -52,6 +52,17 @@ export interface Message {
   detail: string
 }
 
+export type OtpPurpose = 'login' | 'register' | 'password_change'
+
+/** Step 1 of sign-in, sign-up and password change: a 6-digit code was emailed. */
+export interface Challenge {
+  challenge_token: string
+  purpose: OtpPurpose
+  email: string
+  expires_in: number
+  resend_after: number
+}
+
 // ---------------------------------------------------------------- warehouses
 export interface WarehouseRef {
   id: string
@@ -266,5 +277,13 @@ export interface DashboardSummary {
   }[]
   pending_operations: OperationSummary[]
   recent_moves: LedgerEntry[]
+  /** Last 14 days, oldest first (zero-filled). */
+  stock_flow: FlowDay[]
   generated_at: string
+}
+
+export interface FlowDay {
+  day: string
+  inbound: number
+  outbound: number
 }

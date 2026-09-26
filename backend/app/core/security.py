@@ -83,6 +83,16 @@ def create_reset_token(user_id: uuid.UUID, pwd_fingerprint: str) -> tuple[str, s
     return token, jti
 
 
+def create_challenge_token(user_id: uuid.UUID, purpose: str, pwd_fingerprint: str) -> str:
+    """Identifies a pending OTP step (sign-in, sign-up, password change). Holds no secret: the
+    emailed code is what proves ownership. Bound to the current password so it dies on change."""
+    return _encode(
+        {"sub": str(user_id), "type": "otp_challenge", "purpose": purpose, "jti": uuid.uuid4().hex,
+         "pwf": pwd_fingerprint},
+        timedelta(minutes=settings.CHALLENGE_TOKEN_EXPIRE_MINUTES),
+    )
+
+
 def decode_token(token: str, expected_type: str) -> dict[str, Any]:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
